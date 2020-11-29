@@ -44,14 +44,14 @@ let sampleActor(mailbox:Actor<_>)=
     loop()
 let sample=spawne system "sample" <@ sampleActor @>[]
 let Server(mailbox:Actor<_>)=
-    let SubscriberList=new List<IActorRef>()
-    let SubscribedTo=new Dictionary<IActorRef,HashSet<IActorRef>>()
-    let Subscribers=new Dictionary<IActorRef,List<IActorRef>>()
-    let TweetDictionary=new Dictionary<IActorRef,List<Tweet>>()
-    let RegisteredAccounts=new Dictionary<IActorRef,bool>()
-    let tweetMsgMap = new Dictionary<IActorRef,HashSet<Tweet>>()
-    let mentionsMap = new Dictionary<IActorRef,HashSet<Tweet>>()
-    let hashTagMap = new Dictionary<String,HashSet<Tweet>>()
+    let mutable SubscriberList=new List<IActorRef>()
+    let mutable SubscribedTo=new Dictionary<IActorRef,HashSet<IActorRef>>()
+    let mutable Subscribers=new Dictionary<IActorRef,List<IActorRef>>()
+    let mutable TweetDictionary=new Dictionary<IActorRef,List<Tweet>>()
+    let mutable RegisteredAccounts=new Dictionary<IActorRef,bool>()
+    let mutable tweetMsgMap = new Dictionary<IActorRef,HashSet<Tweet>>()
+    let mutable mentionsMap = new Dictionary<IActorRef,HashSet<Tweet>>()
+    let mutable hashTagMap = new Dictionary<String,HashSet<Tweet>>()
     let rec loop() = actor {
         let! msg=mailbox.Receive()
         match msg with
@@ -62,14 +62,17 @@ let Server(mailbox:Actor<_>)=
             |Register(actorRef)->
                 printfn "Registered"
                 RegisteredAccounts.Add(actorRef,true)
-                SubscribedTo.Add(actorRef,null)
+                let tempHash=new HashSet<IActorRef>()
+                SubscribedTo.Add(actorRef,tempHash)
                 let NodeRandom = new Random()
-                let mutable ran = NodeRandom.Next(0,RegisteredAccounts.Count)
+                let mutable ran = NodeRandom.Next(0,SubscriberList.Count)
+                //printfn "ran %i" ran
                 while SubscribedTo.Item(actorRef).Count < ran do
-                    let mutable subsRan=NodeRandom.Next(0,RegisteredAccounts.Count)
+                    let mutable subsRan=NodeRandom.Next(0,SubscriberList.Count)
+                    //printfn "subsRan %i" subsRan
                     let tempActorRef=SubscriberList.Item(subsRan)
                     if((SubscribedTo.Item(actorRef).Contains(tempActorRef))=false) then
-                        SubscribedTo.Item(actorRef).Add(SubscriberList.Item(subsRan))
+                        SubscribedTo.Item(actorRef).Add(tempActorRef)
                 
                 SubscriberList.Add(actorRef)
                 mailbox.Sender()<!SubscriptionDone(actorRef)
@@ -77,14 +80,24 @@ let Server(mailbox:Actor<_>)=
 
 
             |TweetMsg(actorRef,tweetMsg)->
+                let tempMsgMap=new HashSet<Tweet>()
+                let tempHashTagMap = new HashSet<Tweet>()
+                let tempMentionMap = new HashSet<Tweet>()
+                if(tweetMsgMap.ContainsKey(actorRef)=false) then
+                    tweetMsgMap.Add(actorRef,tempMsgMap)
+                
                 tweetMsgMap.Item(actorRef).Add(tweetMsg)|>ignore
                 let hTag=tweetMsg.HashTag
                 for i in hTag do
+                    if(hashTagMap.ContainsKey(i)=false)then
+                        hashTagMap.Add(i,tempHashTagMap)
                     hashTagMap.Item(i).Add(tweetMsg)|>ignore
                 let mentions=tweetMsg.Mentions
                 for i in mentions do
+                    if(mentionsMap.ContainsKey(i)=false)then
+                        mentionsMap.Add(i,tempMentionMap)
                     mentionsMap.Item(i).Add(tweetMsg)|>ignore
-                printfn "TweetMessage"
+                //printfn "TweetMessage %A" tweetMsg
             |Subscribe(actorRef)->
                 SubscribedTo.Item(mailbox.Sender()).Add(actorRef)
                 Subscribers.Item(actorRef).Add(mailbox.Sender())
@@ -93,19 +106,24 @@ let Server(mailbox:Actor<_>)=
                 let tweetList=new List<Tweet>()
                 let followingList=SubscribedTo.Item(mailbox.Sender())
                 for i in followingList do
-                    for j in tweetMsgMap.Item(i) do
-                        tweetList.Add(j)
-                    
+                    if(tweetMsgMap.ContainsKey(i)<>false)then
+                        for j in tweetMsgMap.Item(i) do
+                            tweetList.Add(j)
+                mailbox.Sender()<!PrintTweets(tweetList)    
                 printfn "Query subscribers"
             |QueryTag(tag)->
                 let tweetList=new List<Tweet>()
-                for i in hashTagMap.Item(tag) do
-                    tweetList.Add(i)
+                if(hashTagMap.ContainsKey(tag)<>false)then
+                    for i in hashTagMap.Item(tag) do
+                        tweetList.Add(i)
+                mailbox.Sender()<!PrintTweets(tweetList) 
                 printfn "Query tags"
             |QueryMentions(actorRef)->
                 let tweetList=new List<Tweet>()
-                for i in mentionsMap.Item(actorRef) do
-                    tweetList.Add(i)
+                if(mentionsMap.ContainsKey(actorRef)<>false)then
+                    for i in mentionsMap.Item(actorRef) do
+                        tweetList.Add(i)
+                mailbox.Sender()<!PrintTweets(tweetList) 
                 printfn "Query Mentions"
             |Logout->
                 RegisteredAccounts.Item(mailbox.Sender())=false|>ignore
