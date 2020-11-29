@@ -1,31 +1,51 @@
 ﻿#r "nuget: Akka.FSharp"
 #r "nuget: Akka.Remote"
+#r "nuget: Akka.Serialization.Hyperion"
 #load "MessageType.fs"
-#load "Server.fs"
+//#load "Server.fsx"
+//open Server
 open MessageType
 //open Server
 open System
 open Akka.Actor
 open Akka.Configuration
 open Akka.FSharp
+open Akka.Remote
 open System.Collections.Generic
 open System.Diagnostics
 
 let totalActors = 10
 let actorList=new List<IActorRef>();
-
+let mutable operations =new List<string>();
+operations.Add("Tweet");
+operations.Add("QueryTags")
+operations.Add("QuerySubs")
+operations.Add("QueryMentions")
+let mutable HashList=new List<string>();
+//operators<-{"Tweet";"QueryTags";"QuerySubs";"QueryMentions"}
+let ranStr n : string = 
+    let r = new System.Random()
+    new System.String(Array.init n (fun _ -> char (r.Next(97,123))))
 let config =  
     Configuration.parse
         @"akka {
+        actor.serializers{
+            json  = ""Akka.Serialization.HyperionSerializer, Akka.Serialization.Hyperion""
+            bytes = ""Akka.Serialization.ByteArraySerializer""
+
+        }
+        actor.serialization-bindings {
+            ""System.Byte[]"" = bytes
+            ""System.Object"" = json
+            
+        }
             actor.provider = ""Akka.Remote.RemoteActorRefProvider, Akka.Remote""
-            remote.helios.tcp {
-                hostname = 127.0.0.1
-                port = 9001
-            }
         }"
 
 //let system = System.create "RemoteActorFactory" config
-let system = System.create "system" (Configuration.defaultConfig())
+let system = ActorSystem.Create("ActorFactory", config) 
+//let system = System.create "system" (Configuration.defaultConfig())
+let serv=system.ActorSelection("akka.tcp://RemoteFSharp@127.0.0.1:9001/user/Server")
 let Client(mailbox:Actor<_>)=
     
     let rec loop() = actor {
@@ -33,7 +53,8 @@ let Client(mailbox:Actor<_>)=
         match msg with
             |Sample(s)->
                 printfn "Sample message"
-            |Register(actorRef)->
+            |Register->
+                serv<!Register
                 printfn "Register this client"
             |TweetMsg(actorRef,tweetMsg)->
                 printfn "TweetMessage"
@@ -47,25 +68,88 @@ let Client(mailbox:Actor<_>)=
                 printfn "Query Mentions"
             |Logout->
                 printfn "logout"
+            |PrintTweets(tweetList)->
+                printfn "print tweets"
 
         return! loop()
     }
     loop()
+
+
+
+
+
+for i=1 to totalActors do
+    let actorRef=spawn system (string i) Client
+    actorList.Add(actorRef)
+    actorRef<!Register
 
 let Simulator(mailbox:Actor<_>)=
     let rec loop()=actor{
         let! msg = mailbox.Receive()
-        //match msg with
-        //    |Simulate->
-        //        printfn "start simulation"
+        match msg with
+            |Sample(s)->
+                printfn "start simulation"
+                while(true) do
+                    let newRandom = new Random()
+                    let mutable opNum=newRandom.Next(0,operations.Count)
+                    match operations.Item(opNum) with  
+                        |"Tweet"->
+                            let mutable actorNum=newRandom.Next(0,operations.Count)
+                            let tweetTxt=(ranStr (newRandom.Next(1,100)))
+                            
+                            let mutable hashTagList= new List<string>()
+                            let mutable mentionsSet=new HashSet<IActorRef>()
+                            let hashTagNum=newRandom.Next(0,20)
+                            let mentionsNum=newRandom.Next(0,actorList.Count-1)
+                            for i =0 to hashTagNum do
+                                let hashtag="#"+(ranStr (newRandom.Next(1,10)))
+                                hashTagList.Add(hashtag)
+                                HashList.Add(hashtag)
+                            
+                            while mentionsSet.Count < mentionsNum do
+                                let mutable menRan=newRandom.Next(0,actorList.Count)
+                                if(mentionsSet.Contains(actorList.Item(menRan))=false && actorList.Item(menRan)<>actorList.Item(actorNum)) then
+                                    mentionsSet.Add(actorList.Item(menRan))
+                            let twt={tweetText=tweetTxt;HashTag=hashTagList;Mentions=mentionsSet}
+                            actorList.Item(actorNum)<!TweetMsg(mailbox.Context.Self,twt)
+                        |"QueryTags"->
+                            let mutable actorNum=newRandom.Next(0,operations.Count)
+                            let mutable tagNum=newRandom.Next(0,HashList.Count)
+                            actorList.Item(actorNum)<!QueryTag(HashList.Item(tagNum))
+                        |"QuerySubs"->
+                            let mutable actorNum=newRandom.Next(0,operations.Count)
+                            actorList.Item(actorNum)<!QuerySubs
+                        |"QueryMentions"->
+                            let mutable actorNum=newRandom.Next(0,operations.Count)
+                            let mutable menActorNum=newRandom.Next(0,operations.Count)
+                            while menActorNum=actorNum do
+                                menActorNum=newRandom.Next(0,operations.Count)
+                            actorList.Item(actorNum)<!QueryMentions(actorList.Item(menActorNum))
+                            
+                            
+                            
+                            
+                        
+            |Done->
+                printfn "DoneDonaDone"
         return! loop()
     }
     loop()
+let sim = spawn system "Sim" Simulator
+sim<!Sample("Hello")
+//let serv=spawn system "Server" Server.Server
 
 
-for i=1 to totalActors do
-    actorList.Add(spawn system (string i) Client)
-    Server.server<!Sample("hello")
+//let res = Async.RunSynchronously serv
+//printfn "this is servererrrerere%A" serv
+//serv<!Sample("hello")
 
+    
+    //Server.server<!Register(actorRef)
+
+////let Tweet twtMsg={tweetText:"hello";HashTag:["#1","#2"];Mentions:{actorList.Item(5)}}
+//let twt={tweetText="hello";HashTag=["#1";"#2"];Mentions=[actorList.Item(5)]}
+//serv<!TweetMsg(actorList.Item(0),twt)
 Console.ReadKey()|>ignore
     
