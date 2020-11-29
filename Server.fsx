@@ -45,7 +45,7 @@ let sampleActor(mailbox:Actor<_>)=
 let sample=spawne system "sample" <@ sampleActor @>[]
 let Server(mailbox:Actor<_>)=
     let SubscriberList=new List<IActorRef>()
-    let SubscribedTo=new Dictionary<IActorRef,List<IActorRef>>()
+    let SubscribedTo=new Dictionary<IActorRef,HashSet<IActorRef>>()
     let Subscribers=new Dictionary<IActorRef,List<IActorRef>>()
     let TweetDictionary=new Dictionary<IActorRef,List<Tweet>>()
     let RegisteredAccounts=new Dictionary<IActorRef,bool>()
@@ -59,16 +59,21 @@ let Server(mailbox:Actor<_>)=
             |Sample(s)->
                 printfn "Sample Message"
                 mailbox.Sender()<!"Done"
-            |Register->
-                
+            |Register(actorRef)->
+                printfn "Registered"
+                RegisteredAccounts.Add(actorRef,true)
+                SubscribedTo.Add(actorRef,null)
                 let NodeRandom = new Random()
                 let mutable ran = NodeRandom.Next(0,RegisteredAccounts.Count)
-                while SubscribedTo.Item(mailbox.Sender()).Count < ran do
+                while SubscribedTo.Item(actorRef).Count < ran do
                     let mutable subsRan=NodeRandom.Next(0,RegisteredAccounts.Count)
-                    //if((string subsRan)<>mailbox.Sender().Path.Name) then
-                    SubscribedTo.Item(mailbox.Sender()).Add(SubscriberList.Item(subsRan))
-                RegisteredAccounts.Add(mailbox.Sender(),true)
-                SubscriberList.Add(mailbox.Sender())
+                    let tempActorRef=SubscriberList.Item(subsRan)
+                    if((SubscribedTo.Item(actorRef).Contains(tempActorRef))=false) then
+                        SubscribedTo.Item(actorRef).Add(SubscriberList.Item(subsRan))
+                
+                SubscriberList.Add(actorRef)
+                mailbox.Sender()<!SubscriptionDone(actorRef)
+                
 
 
             |TweetMsg(actorRef,tweetMsg)->

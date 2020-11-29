@@ -15,6 +15,7 @@ open System.Collections.Generic
 open System.Diagnostics
 
 let totalActors = 10
+let mutable Counter=0
 let actorList=new List<IActorRef>();
 let mutable operations =new List<string>();
 operations.Add("Tweet");
@@ -53,9 +54,6 @@ let Client(mailbox:Actor<_>)=
         match msg with
             |Sample(s)->
                 printfn "Sample message"
-            |Register->
-                serv<!Register
-                printfn "Register this client"
             |TweetMsg(actorRef,tweetMsg)->
                 printfn "TweetMessage"
             |Subscribe(actorRef)->
@@ -79,20 +77,21 @@ let Client(mailbox:Actor<_>)=
 
 
 
-for i=1 to totalActors do
-    let actorRef=spawn system (string i) Client
-    actorList.Add(actorRef)
-    actorRef<!Register
+
 
 let Simulator(mailbox:Actor<_>)=
     let rec loop()=actor{
         let! msg = mailbox.Receive()
         match msg with
-            |Sample(s)->
+            |Register(dummy)->
+                let actorRef=spawn system (string Counter) Client
+                serv<!Register(actorRef)
+            |Simulate->
                 printfn "start simulation"
                 while(true) do
                     let newRandom = new Random()
                     let mutable opNum=newRandom.Next(0,operations.Count)
+                    printfn "%s" (operations.Item(opNum))
                     match operations.Item(opNum) with  
                         |"Tweet"->
                             let mutable actorNum=newRandom.Next(0,operations.Count)
@@ -126,18 +125,22 @@ let Simulator(mailbox:Actor<_>)=
                             while menActorNum=actorNum do
                                 menActorNum=newRandom.Next(0,operations.Count)
                             actorList.Item(actorNum)<!QueryMentions(actorList.Item(menActorNum))
-                            
-                            
-                            
-                            
-                        
-            |Done->
-                printfn "DoneDonaDone"
+   
+            |SubscriptionDone(actorRef)->
+                Counter<-Counter+1
+                if(Counter=totalActors) then
+                    mailbox.Context.Self<!Simulate
+                else
+                    mailbox.Context.Self<!Register(actorRef)
         return! loop()
     }
     loop()
 let sim = spawn system "Sim" Simulator
-sim<!Sample("Hello")
+//for i=1 to totalActors do
+//    let actorRef=spawn system (string i) Client
+    //actorList.Add(actorRef)
+    //actorRef<!Register
+sim<!Register
 //let serv=spawn system "Server" Server.Server
 
 
@@ -151,5 +154,7 @@ sim<!Sample("Hello")
 ////let Tweet twtMsg={tweetText:"hello";HashTag:["#1","#2"];Mentions:{actorList.Item(5)}}
 //let twt={tweetText="hello";HashTag=["#1";"#2"];Mentions=[actorList.Item(5)]}
 //serv<!TweetMsg(actorList.Item(0),twt)
+Async.RunSynchronously <| Async.Sleep(30000)
+
 Console.ReadKey()|>ignore
     

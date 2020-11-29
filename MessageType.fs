@@ -14,7 +14,7 @@ type Tweet=
 
 type TweeterEngine =
     |Sample of String
-    |Register
+    |Register of IActorRef
     |TweetMsg of IActorRef * Tweet
     |Subscribe of IActorRef
     |QuerySubs
@@ -23,4 +23,6 @@ type TweeterEngine =
     |Logout
     |Done
     |PrintTweets of List<Tweet>
+    |SubscriptionDone of IActorRef
+    |Simulate
 
