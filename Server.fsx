@@ -29,7 +29,12 @@ let config =
             remote.helios.tcp {
             hostname = 127.0.0.1
             port = 9001
+            send-buffer-size = 5120000b
+            receive-buffer-size = 5120000b
+            maximum-frame-size = 1024000b
+            tcp-keepalive = on
             }
+            
 
         }"
 
@@ -109,21 +114,21 @@ let Server(mailbox:Actor<_>)=
                     if(tweetMsgMap.ContainsKey(i)<>false)then
                         for j in tweetMsgMap.Item(i) do
                             tweetList.Add(j)
-                mailbox.Sender()<!PrintTweets(tweetList)    
+                //mailbox.Sender()<!PrintTweets(tweetList)    
                 printfn "Query subscribers"
             |QueryTag(tag)->
                 let tweetList=new List<Tweet>()
                 if(hashTagMap.ContainsKey(tag)<>false)then
                     for i in hashTagMap.Item(tag) do
                         tweetList.Add(i)
-                mailbox.Sender()<!PrintTweets(tweetList) 
+                //mailbox.Sender()<!PrintTweets(tweetList) 
                 printfn "Query tags"
             |QueryMentions(actorRef)->
                 let tweetList=new List<Tweet>()
                 if(mentionsMap.ContainsKey(actorRef)<>false)then
                     for i in mentionsMap.Item(actorRef) do
                         tweetList.Add(i)
-                mailbox.Sender()<!PrintTweets(tweetList) 
+                //mailbox.Sender()<!PrintTweets(tweetList) 
                 printfn "Query Mentions"
             |Logout->
                 RegisteredAccounts.Item(mailbox.Sender())=false|>ignore

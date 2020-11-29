@@ -30,6 +30,7 @@ let ranStr n : string =
 let config =  
     Configuration.parse
         @"akka {
+        
         actor.serializers{
             json  = ""Akka.Serialization.HyperionSerializer, Akka.Serialization.Hyperion""
             bytes = ""Akka.Serialization.ByteArraySerializer""
@@ -55,23 +56,23 @@ let Client(mailbox:Actor<_>)=
             |Sample(s)->
                 printfn "Sample message"
             |TweetMsg(actorRef,tweetMsg)->
-                printfn "TweetMessage"
+                //printfn "TweetMessage"
                 serv<!TweetMsg(actorRef,tweetMsg)
             |Subscribe(actorRef)->
                 printfn "subscribe to a specific client"
             |QuerySubs->
                 serv<!QuerySubs
-                printfn "Query subscribers"
+                //printfn "Query subscribers"
             |QueryTag(tag)->
                 serv<!QueryTag(tag)
-                printfn "Query tags"
+                //printfn "Query tags"
             |QueryMentions(actorRef)->
                 serv<!QueryMentions(actorRef)
-                printfn "Query Mentions"
+                //printfn "Query Mentions"
             |Logout->
                 printfn "logout"
             |PrintTweets(tweetList)->
-                printfn "print tweets"
+                //printfn "print tweets"
                 printfn "%A" tweetList
 
         return! loop()
@@ -114,23 +115,28 @@ let Simulator(mailbox:Actor<_>)=
                                 HashList.Add(hashtag)
                             
                             while mentionsSet.Count < mentionsNum do
+                                printfn "this while loop1 %i" actorList.Count
                                 let mutable menRan=newRandom.Next(0,actorList.Count)
                                 if(mentionsSet.Contains(actorList.Item(menRan))=false && actorList.Item(menRan)<>actorList.Item(actorNum)) then
                                     mentionsSet.Add(actorList.Item(menRan))
                             let twt={tweetText=tweetTxt;HashTag=hashTagList;Mentions=mentionsSet}
                             actorList.Item(actorNum)<!TweetMsg(actorList.Item(actorNum),twt)
                         |"QueryTags"->
-                            let mutable actorNum=newRandom.Next(0,operations.Count)
-                            let mutable tagNum=newRandom.Next(0,HashList.Count)
-                            actorList.Item(actorNum)<!QueryTag(HashList.Item(tagNum))
+                            if(HashList.Count>0)then
+                                let mutable actorNum=newRandom.Next(0,actorList.Count)
+                                let mutable tagNum=newRandom.Next(0,HashList.Count)
+                                actorList.Item(actorNum)<!QueryTag(HashList.Item(tagNum))
                         |"QuerySubs"->
-                            let mutable actorNum=newRandom.Next(0,operations.Count)
+                            let mutable actorNum=newRandom.Next(0,actorList.Count)
                             actorList.Item(actorNum)<!QuerySubs
                         |"QueryMentions"->
-                            let mutable actorNum=newRandom.Next(0,operations.Count)
-                            let mutable menActorNum=newRandom.Next(0,actorList.Count)
+
+                            let mutable actorNum=newRandom.Next(0,actorList.Count)
+                            let newRandom2 = new Random()
+                            let mutable menActorNum=newRandom2.Next(0,actorList.Count)
                             while menActorNum=actorNum do
-                                menActorNum=newRandom.Next(0,actorList.Count)
+                                printfn "this while loop2 %i %i" menActorNum actorNum
+                                menActorNum<-newRandom2.Next(0,actorList.Count)
                             actorList.Item(actorNum)<!QueryMentions(actorList.Item(menActorNum))
    
             |SubscriptionDone(actorRef)->
