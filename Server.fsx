@@ -2,7 +2,9 @@
 #r "nuget: Akka.FSharp"
 #r "nuget: Akka.Remote"
 #r "nuget: Akka.Serialization.Hyperion"
+#r "nuget: MathNet.Numerics"
 #load "MessageType.fs"
+open MathNet.Numerics
 open MessageType
 open System
 open Akka.Actor
@@ -10,6 +12,11 @@ open Akka.FSharp
 open Akka.Remote
 open System.Collections.Generic
 open Akka.Serialization
+
+
+
+
+let mutable maxSubs=0;
 
 let config =  
     Configuration.parse
@@ -51,7 +58,7 @@ let sample=spawne system "sample" <@ sampleActor @>[]
 let Server(mailbox:Actor<_>)=
     let mutable SubscriberList=new List<IActorRef>()
     let mutable SubscribedTo=new Dictionary<IActorRef,HashSet<IActorRef>>()
-    let mutable Subscribers=new Dictionary<IActorRef,List<IActorRef>>()
+    let mutable Subscribers=new Dictionary<IActorRef,HashSet<IActorRef>>()
     let mutable TweetDictionary=new Dictionary<IActorRef,List<Tweet>>()
     let mutable RegisteredAccounts=new Dictionary<IActorRef,bool>()
     let mutable tweetMsgMap = new Dictionary<IActorRef,HashSet<Tweet>>()
@@ -67,18 +74,26 @@ let Server(mailbox:Actor<_>)=
             |Register(actorRef)->
                 printfn "Registered"
                 RegisteredAccounts.Add(actorRef,true)
-                let tempHash=new HashSet<IActorRef>()
-                SubscribedTo.Add(actorRef,tempHash)
-                let NodeRandom = new Random()
-                let mutable ran = NodeRandom.Next(0,SubscriberList.Count)
-                //printfn "ran %i" ran
-                while SubscribedTo.Item(actorRef).Count < ran do
-                    let mutable subsRan=NodeRandom.Next(0,SubscriberList.Count)
-                    //printfn "subsRan %i" subsRan
-                    let tempActorRef=SubscriberList.Item(subsRan)
-                    if((SubscribedTo.Item(actorRef).Contains(tempActorRef))=false) then
-                        SubscribedTo.Item(actorRef).Add(tempActorRef)
+                //let tempHash=new HashSet<IActorRef>()
                 
+                //SubscribedTo.Add(actorRef,tempHash)
+                //let NodeRandom = new Random()
+                //let mutable ran = NodeRandom.Next(0,(SubscriberList.Count/4))
+                
+                ////printfn "ran %i" ran
+                //while SubscribedTo.Item(actorRef).Count < ran do
+                //    //let mutable subsRan=NodeRandom.Next(0,(SubscriberList.Count/4))
+                //    let mutable subsRan = Distributions.Zipf.Sample(0.0,SubscriberList.Count-1)
+                //    //printfn "subsRan %i" subsRan
+                //    printfn "list size %i" SubscriberList.Count
+                //    let tempActorRef=SubscriberList.Item(subsRan)
+                //    if((SubscribedTo.Item(actorRef).Contains(tempActorRef))=false) then
+                //        SubscribedTo.Item(actorRef).Add(tempActorRef)|>ignore
+                //        let mutable tempSubs=new HashSet<IActorRef>()
+                //        if(Subscribers.ContainsKey(tempActorRef)=false)then
+                //            Subscribers.Add(tempActorRef,tempSubs)
+                //        Subscribers.Item(tempActorRef).Add(actorRef)|>ignore
+                //        maxSubs<- max (Subscribers.Item(tempActorRef).Count) maxSubs
                 SubscriberList.Add(actorRef)
                 mailbox.Sender()<!SubscriptionDone(actorRef)
                 
@@ -103,18 +118,39 @@ let Server(mailbox:Actor<_>)=
                         mentionsMap.Add(i,tempMentionMap)
                     mentionsMap.Item(i).Add(tweetMsg)|>ignore
                 //printfn "TweetMessage %A" tweetMsg
-            |Subscribe(actorRef)->
-                SubscribedTo.Item(mailbox.Sender()).Add(actorRef)
-                Subscribers.Item(actorRef).Add(mailbox.Sender())
-                printfn "subscribe to a specific client"
+            |Subscribe(num)->
+                //let tempSt=new HashSet<IActorRef>()
+                //let tempS=new HashSet<IActorRef>()
+                //if(SubscribedTo.ContainsKey(mailbox.Sender())=false)then
+                //    SubscribedTo.Add(mailbox.Sender(),tempSt)
+                //let mutable subsRan = Distributions.Zipf.Sample(2.0,SubscriberList.Count-1)
+                //while(SubscribedTo.Item(mailbox.Sender()).Contains(SubscriberList.Item(subsRan)))do
+                //    subsRan <- Distributions.Zipf.Sample(2.0,SubscriberList.Count-1)
+                //SubscribedTo.Item(mailbox.Sender()).Add(SubscriberList.Item(subsRan))|>ignore
+                //if(Subscribers.ContainsKey(SubscriberList.Item(subsRan))=false)then
+                //    Subscribers.Add(SubscriberList.Item(subsRan),tempS)
+                //Subscribers.Item(SubscriberList.Item(subsRan)).Add(mailbox.Sender())|>ignore
+                let NodeRandom = new Random()
+                let tempSt=new HashSet<IActorRef>()
+                let tempS=new HashSet<IActorRef>()
+                if(Subscribers.ContainsKey(mailbox.Sender())=false)then
+                    Subscribers.Add(mailbox.Sender(),tempS)
+                while(Subscribers.Item(mailbox.Sender()).Count <=num)do
+                    let tempRandom=NodeRandom.Next(0,SubscriberList.Count)
+                    Subscribers.Item(mailbox.Sender()).Add(SubscriberList.Item(tempRandom))
+                    if(SubscribedTo.ContainsKey(SubscriberList.Item(tempRandom))=false)then
+                        SubscribedTo.Add(SubscriberList.Item(tempRandom),tempSt)
+                    SubscribedTo.Item(SubscriberList.Item(tempRandom)).Add(mailbox.Sender())
+                //printfn "subscribe to a specific client"
             |QuerySubs->
                 let tweetList=new List<Tweet>()
-                let followingList=SubscribedTo.Item(mailbox.Sender())
-                for i in followingList do
-                    if(tweetMsgMap.ContainsKey(i)<>false)then
-                        for j in tweetMsgMap.Item(i) do
-                            tweetList.Add(j)
-                //mailbox.Sender()<!PrintTweets(tweetList)    
+                if(SubscribedTo.ContainsKey(mailbox.Sender())=true)then
+                    let followingList=SubscribedTo.Item(mailbox.Sender())
+                    for i in followingList do
+                        if(tweetMsgMap.ContainsKey(i)<>false)then
+                            for j in tweetMsgMap.Item(i) do
+                                tweetList.Add(j)
+                    //mailbox.Sender()<!PrintTweets(tweetList)    
                 printfn "Query subscribers"
             |QueryTag(tag)->
                 let tweetList=new List<Tweet>()
@@ -133,6 +169,10 @@ let Server(mailbox:Actor<_>)=
             |Logout->
                 RegisteredAccounts.Item(mailbox.Sender())=false|>ignore
                 printfn "logout"
+            |GetSubscriberRanksInfo->
+                printfn "user   Subs"
+                for i in Subscribers do
+                    printfn "%i" (i.Value.Count)
         return! loop()
     }
     loop()

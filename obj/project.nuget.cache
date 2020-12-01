@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "UE1uKBNv/dL3h/DhNkeYmh6Sf6v3HQXsIoZZTWqVl5dLIpi35se2HsEwVim7T0oZ0L5n//vYFuGrQjQA5EYt6w==",
+  "dgSpecHash": "eXA46V8RMroza7ENLg4TFYD0UebDmEk9raO3K7ByOjjW/pFhY7BTPWt9voSwEUieoFS/R5aQ/+4raQ2ciJGpbg==",
   "success": true,
   "projectFilePath": "C:\\Users\\VETSAdmin\\source\\repos\\Tweeter\\Tweeter\\Tweeter.fsproj",
   "expectedPackageFiles": [
@@ -18,6 +18,8 @@
     "C:\\Users\\VETSAdmin\\.nuget\\packages\\fspickler\\5.3.2\\fspickler.5.3.2.nupkg.sha512",
     "C:\\Users\\VETSAdmin\\.nuget\\packages\\google.protobuf\\3.14.0\\google.protobuf.3.14.0.nupkg.sha512",
     "C:\\Users\\VETSAdmin\\.nuget\\packages\\hyperion\\0.9.16\\hyperion.0.9.16.nupkg.sha512",
+    "C:\\Users\\VETSAdmin\\.nuget\\packages\\mathnet.numerics\\4.12.0\\mathnet.numerics.4.12.0.nupkg.sha512",
+    "C:\\Users\\VETSAdmin\\.nuget\\packages\\mathnet.numerics.fsharp\\4.12.0\\mathnet.numerics.fsharp.4.12.0.nupkg.sha512",
     "C:\\Users\\VETSAdmin\\.nuget\\packages\\microsoft.csharp\\4.7.0\\microsoft.csharp.4.7.0.nupkg.sha512",
     "C:\\Users\\VETSAdmin\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\1.1.0\\microsoft.extensions.dependencyinjection.abstractions.1.1.0.nupkg.sha512",
     "C:\\Users\\VETSAdmin\\.nuget\\packages\\microsoft.extensions.logging\\1.1.1\\microsoft.extensions.logging.1.1.1.nupkg.sha512",

@@ -16,7 +16,7 @@ type TweeterEngine =
     |Sample of String
     |Register of IActorRef
     |TweetMsg of IActorRef * Tweet
-    |Subscribe of IActorRef
+    |Subscribe of int
     |QuerySubs
     |QueryTag of String
     |QueryMentions of IActorRef
@@ -25,4 +25,5 @@ type TweeterEngine =
     |PrintTweets of List<Tweet>
     |SubscriptionDone of IActorRef
     |Simulate
+    |GetSubscriberRanksInfo
 
