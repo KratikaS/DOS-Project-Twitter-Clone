@@ -13,17 +13,21 @@ type Tweet=
     }
 
 type TweeterEngine =
+    |InitializeValues of int
+    |StartTimers
     |Sample of String
-    |Register of IActorRef
-    |TweetMsg of IActorRef * Tweet
+    |Register of IActorRef * int
+    |TweetMsg of IActorRef * Tweet * int
     |Subscribe of int
-    |QuerySubs
-    |QueryTag of String
-    |QueryMentions of IActorRef
+    |QuerySubs of int
+    |QueryTag of String * int
+    |QueryMentions of IActorRef * int * int
+    |Login
     |Logout
-    |Done
     |PrintTweets of List<Tweet>
     |SubscriptionDone of IActorRef
     |Simulate
     |GetSubscriberRanksInfo
-
+    |Retweet of int * int *IActorRef
+    |PrintRetweet of Tweet * int * int
+    |LiveFeed of Tweet * IActorRef
