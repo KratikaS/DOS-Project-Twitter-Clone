@@ -18,25 +18,24 @@ let config =
     Configuration.parse
         @"akka {
             actor.serializers{
-                json  = ""Akka.Serialization.HyperionSerializer, Akka.Serialization.Hyperion""
-                bytes = ""Akka.Serialization.ByteArraySerializer""
+                wire  = ""Akka.Serialization.HyperionSerializer, Akka.Serialization.Hyperion""
             }
             actor.serialization-bindings {
-                ""System.Byte[]"" = bytes
-                ""System.Object"" = json 
-                
+                ""System.Object"" = wire 
             }
             actor.provider = ""Akka.Remote.RemoteActorRefProvider, Akka.Remote""
-            
-            remote.helios.tcp {
-            hostname = 127.0.0.1
-            port = 9004
-            send-buffer-size = 5120000b
-            receive-buffer-size = 5120000b
-            maximum-frame-size = 1024000b
-            tcp-keepalive = on
+            remote {
+                maximum-payload-bytes = 30000000 bytes
+                dot-netty.tcp {
+                    hostname = 127.0.0.1
+                    port = 9004
+                    message-frame-size =  30000000b
+                    send-buffer-size =  30000000b
+                    receive-buffer-size =  30000000b
+                    maximum-frame-size = 30000000b
+                    tcp-reuse-addr = off
+                }
             }
-            
         }"
 
 
@@ -87,10 +86,9 @@ let Server(mailbox:Actor<_>)=
                 SubscriberList.Add(actorRef)
                 mailbox.Sender()<!SubscriptionDone(actorRef)
                
-            |TweetMsg(actorRef,tweetMsg, i)->
+            |TweetMsg(actorRef,tweetMsg, i,printAct)->
                 numTweets<-numTweets+1
                 totalOperations<-totalOperations-1
-                printfn "operations remaining %i" totalOperations
                 if(RegisteredAccounts.Item(actorRef)=false)then
                     RegisteredAccounts.Item(actorRef)<-true
                     printfn "User %s logged in" (mailbox.Sender().Path.Name)
@@ -103,19 +101,29 @@ let Server(mailbox:Actor<_>)=
                 
                 tweetMsgMap.Item(actorRef).Add(tweetMsg)|>ignore
                 let hTag=tweetMsg.HashTag
-                for i in hTag do
-                    if(hashTagMap.ContainsKey(i)=false)then
-                        hashTagMap.Add(i,tempHashTagMap)
-                    hashTagMap.Item(i).Add(tweetMsg)|>ignore
+                for j in hTag do
+                    if(hashTagMap.ContainsKey(j)=false)then
+                        hashTagMap.Add(j,tempHashTagMap)
+                    hashTagMap.Item(j).Add(tweetMsg)|>ignore
                 let mentions=tweetMsg.Mentions
-                for i in mentions do
-                    if(mentionsMap.ContainsKey(i)=false)then
-                        mentionsMap.Add(i,tempMentionMap)
-                    mentionsMap.Item(i).Add(tweetMsg)|>ignore
+                for j in mentions do
+                    if(mentionsMap.ContainsKey(j)=false)then
+                        mentionsMap.Add(j,tempMentionMap)
+                    mentionsMap.Item(j).Add(tweetMsg)|>ignore
                 //TweetDictionary.Add(actorRef,tweetMsg)
-                for i in Subscribers.Item(actorRef) do
-                    if(RegisteredAccounts.Item(i)=true)then
-                        i<!LiveFeed(tweetMsg,actorRef)
+                let mutable str1 = "live feed from user "
+                str1<- str1 + (actorRef.Path.Name)
+                let mutable str2 = " to "
+                str1 <- str1+str2
+                let str3 = ","
+                let str4 = " received"
+                for j in Subscribers.Item(actorRef) do
+                    if(RegisteredAccounts.Item(j)=true)then
+                        str1 <- str1+  (j.Path.Name)+str3
+                        //j<!LiveFeed(tweetMsg,actorRef)
+                       // printAct <! PrintLive(i,j.Path.Name|>int)
+                str1<-str1+str4
+                printAct <! PrintLive(str1)
                 printfn "Tweet done by user number %A" i
                 if(totalOperations=0)then
                     mailbox.Context.Self<!GetSubscriberRanksInfo
@@ -126,13 +134,15 @@ let Server(mailbox:Actor<_>)=
                 if(Subscribers.ContainsKey(mailbox.Sender())=false)then
                     Subscribers.Add(mailbox.Sender(),tempS)
                 while(Subscribers.Item(mailbox.Sender()).Count <=num)do
-                    let tempRandom=NodeRandom.Next(0,SubscriberList.Count)
-                    Subscribers.Item(mailbox.Sender()).Add(SubscriberList.Item(tempRandom))
-                    if(SubscribedTo.ContainsKey(SubscriberList.Item(tempRandom))=false)then
+                    let mutable tempRandom=NodeRandom.Next(0,SubscriberList.Count)
+                    while(SubscriberList.Item(tempRandom)=mailbox.Sender()) do
+                          tempRandom<-NodeRandom.Next(0,SubscriberList.Count)
+                    Subscribers.Item(mailbox.Sender()).Add(SubscriberList.Item(tempRandom)) |>ignore
+                    if((SubscribedTo.ContainsKey(SubscriberList.Item(tempRandom)))=false)then
                         SubscribedTo.Add(SubscriberList.Item(tempRandom),tempSt)
-                    SubscribedTo.Item(SubscriberList.Item(tempRandom)).Add(mailbox.Sender())
+                    SubscribedTo.Item(SubscriberList.Item(tempRandom)).Add(mailbox.Sender()) |>ignore
                 //printfn "subscribe to a specific client"
-            |QuerySubs(user)->
+            |QuerySubs(user,printAct)->
                 numQueries<-numQueries+1
                 totalOperations<-totalOperations-1
                 printfn "operations remaining %i" totalOperations
@@ -145,25 +155,25 @@ let Server(mailbox:Actor<_>)=
                                 tweetList.Add(j)
                     //mailbox.Sender()<!PrintTweets(tweetList)    
                 printfn "subscribers queried by user %i" user 
+                printAct<!PrintQuerySubs(tweetList)
                 if(totalOperations=0)then
                     mailbox.Context.Self<!GetSubscriberRanksInfo
-            |QueryTag(tag, user)->
+            |QueryTag(tag, user,printAct)->
                 numQueries<-numQueries+1
                 totalOperations<-totalOperations-1
-                printfn "operations remaining %i" totalOperations
-                let tweetList=new List<Tweet>()
-                if(hashTagMap.ContainsKey(tag)<>false)then
-                    for i in hashTagMap.Item(tag) do
-                        tweetList.Add(i)
-                
-                printfn "Hashtag queries by user %i %s" user tag
+                if (tag<>" ") then
+                    let tweetList=new List<Tweet>()
+                    if(hashTagMap.ContainsKey(tag)<>false)then
+                        for i in hashTagMap.Item(tag) do
+                            tweetList.Add(i)                 
+                    printfn "Hashtag queries by user %i %s" user tag
+                    printAct<!PrintQueryTag(tweetList,tag)
                 if(totalOperations=0)then
                     mailbox.Context.Self<!GetSubscriberRanksInfo
                 //mailbox.Sender()<!PrintTweets(tweetList) 
-            |QueryMentions(actorRef, queryingActor, queriedActor)->
+            |QueryMentions(actorRef, queryingActor, queriedActor,printAct)->
                 numQueries<-numQueries+1
                 totalOperations<-totalOperations-1
-                printfn "operations remaining %i" totalOperations
                 let tweetList=new List<Tweet>()
                 if(mentionsMap.ContainsKey(actorRef)<>false)then
                     for i in mentionsMap.Item(actorRef) do
@@ -172,12 +182,12 @@ let Server(mailbox:Actor<_>)=
                 
                 printf "user %i" queryingActor
                 printfn " mentioned the following actor in its query %A" queriedActor
+                printAct<!PrintQueryMention(tweetList,actorRef.Path.Name)
                 if(totalOperations=0)then
                     mailbox.Context.Self<!GetSubscriberRanksInfo
-            |Retweet(retweeter, tweetBy, actorRef)->
+            |Retweet(retweeter, tweetBy, actorRef,printAct)->
                  numTweets<-numTweets+1
                  totalOperations<-totalOperations-1
-                 printfn "operations remaining %i" totalOperations
                  //mailbox.Sender()<!PrintRetweet(user,TweetDictionary)
                  
                  if(tweetMsgMap.ContainsKey(actorRef)) then
@@ -185,13 +195,13 @@ let Server(mailbox:Actor<_>)=
                     printfn " retweeted "
                     let NodeRandom = new Random()
                     let tweet=tweetMsgMap.Item(actorRef).SelectVariation(1,NodeRandom).First()
-                    mailbox.Sender()<! PrintRetweet(tweet,retweeter,tweetBy)
+                    printAct<! PrintRetweet(tweet,retweeter,tweetBy)
+                    
                  if(totalOperations=0)then
                      mailbox.Context.Self<!GetSubscriberRanksInfo
                     //printfn " retweeted the tweet %A" (retweetList.Item(actorList.Item(menActorNum)))
             |Logout->
                 totalOperations<-totalOperations-1
-                printfn "operations remaining %i" totalOperations
                 if(RegisteredAccounts.Item(mailbox.Sender())=true)then
                     RegisteredAccounts.Item(mailbox.Sender())<-false
                     printfn "User %s logged out" (mailbox.Sender().Path.Name)
@@ -199,15 +209,12 @@ let Server(mailbox:Actor<_>)=
                     mailbox.Context.Self<!GetSubscriberRanksInfo
             |Login->
                 totalOperations<-totalOperations-1
-                printfn "operations remaining %i" totalOperations
                 if(RegisteredAccounts.Item(mailbox.Sender())=false)then
                     RegisteredAccounts.Item(mailbox.Sender())<-true
                     printfn "User %s Logged In" (mailbox.Sender().Path.Name)
                 if(totalOperations=0)then
                     mailbox.Context.Self<!GetSubscriberRanksInfo
             |GetSubscriberRanksInfo->
-                printfn "user   Subs"
-                printfn "size of Subscribers %i" Subscribers.Count
                 for i in Subscribers do
                     printfn "%i" (i.Value.Count)
                 timer1.Stop()
@@ -216,7 +223,7 @@ let Server(mailbox:Actor<_>)=
                 printfn "Total Queries processed %i" numQueries
                 let timeNum=timer1.ElapsedMilliseconds|>double
                 printfn "Time per operation %f" (double finalOperations/timeNum) 
-
+            |_ -> printf ""
         return! loop()
     }
     loop()

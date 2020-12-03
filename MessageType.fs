@@ -17,17 +17,20 @@ type TweeterEngine =
     |StartTimers
     |Sample of String
     |Register of IActorRef * int
-    |TweetMsg of IActorRef * Tweet * int
+    |TweetMsg of IActorRef * Tweet * int * IActorRef
     |Subscribe of int
-    |QuerySubs of int
-    |QueryTag of String * int
-    |QueryMentions of IActorRef * int * int
+    |QuerySubs of int *IActorRef
+    |QueryTag of String * int *IActorRef
+    |QueryMentions of IActorRef * int * int *IActorRef
     |Login
     |Logout
-    |PrintTweets of List<Tweet>
     |SubscriptionDone of IActorRef
     |Simulate
     |GetSubscriberRanksInfo
-    |Retweet of int * int *IActorRef
+    |Retweet of int * int *IActorRef * IActorRef
     |PrintRetweet of Tweet * int * int
     |LiveFeed of Tweet * IActorRef
+    |PrintLive of string 
+    |PrintQueryTag of List<Tweet>* string
+    |PrintQueryMention of List<Tweet> * string
+    |PrintQuerySubs of List<Tweet>
