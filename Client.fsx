@@ -39,7 +39,7 @@ let config =
 let args : string array = fsi.CommandLineArgs |> Array.tail
 let totalOperations = args.[0] |> int
 let totalActors = args.[1] |>int
-
+let timer2 = new Stopwatch()
 //let totalOperations=1000
 //printfn "Enter the total number of users"
 //let totalActors = 1000
@@ -79,12 +79,16 @@ let PrinterActor(mailbox:Actor<_>)=
            |PrintRetweet(reTweet, tweeter, user)->
                 printf "user %i"tweeter 
                 printfn " retweeted tweet by user %i"user
-           |PrintQuerySubs(TweetList)->
+           |PrintQuerySubs->
                 printfn "Query response received for subscribers query"
-           |PrintQueryTag(TweetList,tag)->
+           |PrintQueryTag(tag)->
                printfn "Query response received for %s query" tag
-           |PrintQueryMention(TweetList,user)->
+           |PrintQueryMention(user)->
                printfn "Query response received for mentioned user %s query" user
+           |Done->
+               timer2.Stop()
+               printfn "time taken to complete %i operations: %d ms" totalOperations timer2.ElapsedMilliseconds
+               printfn "Please press any key to end the simulation"
            |_-> printf ""
         return! loop()
     }
@@ -141,6 +145,7 @@ let Simulator(mailbox:Actor<_>)=
                 actorCounter <- actorCounter+1
                 serv<!Register(actorRef, actorCounter)
             |Simulate->
+                timer2.Start()
                 printfn "start simulation"
                 let newRandom = new Random()
                 while(operationCount<=totalOperations) do
@@ -264,6 +269,7 @@ let Simulator(mailbox:Actor<_>)=
                         actorList.Item(i)<!Subscribe(1)
             |StartTimers->
                 serv<!StartTimers
+            
             |_ -> printf ""
             
         return! loop()
@@ -273,7 +279,7 @@ let Simulator(mailbox:Actor<_>)=
 
 let sim = spawn system "Sim" Simulator
 printfn "Initializing the users and its subscribers according to zipf distribution"
-serv<!InitializeValues(totalOperations)
+serv<!InitializeValues(totalOperations,printAct)
 sim<!Register(sim,0)
 
 Console.ReadKey()|>ignore

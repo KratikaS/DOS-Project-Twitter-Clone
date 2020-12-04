@@ -13,7 +13,7 @@ type Tweet=
     }
 
 type TweeterEngine =
-    |InitializeValues of int
+    |InitializeValues of int *IActorRef
     |StartTimers
     |Sample of String
     |Register of IActorRef * int
@@ -31,6 +31,7 @@ type TweeterEngine =
     |PrintRetweet of Tweet * int * int
     |LiveFeed of Tweet * IActorRef
     |PrintLive of string 
-    |PrintQueryTag of List<Tweet>* string
-    |PrintQueryMention of List<Tweet> * string
-    |PrintQuerySubs of List<Tweet>
+    |PrintQueryTag of string
+    |PrintQueryMention of  string
+    |PrintQuerySubs 
+    |Done

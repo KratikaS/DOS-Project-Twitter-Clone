@@ -46,8 +46,17 @@ let mutable maxSubs=0;
 let mutable numQueries=0;
 let mutable numTweets=0;
 
-
 let system = System.create "RemoteFSharp" config
+let dummyActor(mailbox:Actor<_>)=
+    let rec loop(x) = actor {
+        let! msg=mailbox.Receive()
+        match msg with
+            |_->printfn ""
+        return! loop(x)
+    }
+    loop(0)
+let dummyRef=spawn system "dummy" dummyActor
+let mutable printerActor=dummyRef
 let timer1 = new Stopwatch()
 //let system = System.create "system" (Configuration.defaultConfig())
 let sampleActor(mailbox:Actor<_>)=
@@ -71,9 +80,10 @@ let Server(mailbox:Actor<_>)=
     let rec loop() = actor {
         let! msg=mailbox.Receive()
         match msg with
-            |InitializeValues(num)->
+            |InitializeValues(num,simActor)->
                 totalOperations<-num
                 finalOperations<-num
+                printerActor<-simActor
             |StartTimers->
                 timer1.Start()
             |Sample(s)->
@@ -155,7 +165,7 @@ let Server(mailbox:Actor<_>)=
                                 tweetList.Add(j)
                     //mailbox.Sender()<!PrintTweets(tweetList)    
                 printfn "subscribers queried by user %i" user 
-                printAct<!PrintQuerySubs(tweetList)
+                printAct<!PrintQuerySubs
                 if(totalOperations=0)then
                     mailbox.Context.Self<!GetSubscriberRanksInfo
             |QueryTag(tag, user,printAct)->
@@ -167,7 +177,7 @@ let Server(mailbox:Actor<_>)=
                         for i in hashTagMap.Item(tag) do
                             tweetList.Add(i)                 
                     printfn "Hashtag queries by user %i %s" user tag
-                    printAct<!PrintQueryTag(tweetList,tag)
+                    printAct<!PrintQueryTag(tag)
                 if(totalOperations=0)then
                     mailbox.Context.Self<!GetSubscriberRanksInfo
                 //mailbox.Sender()<!PrintTweets(tweetList) 
@@ -182,7 +192,7 @@ let Server(mailbox:Actor<_>)=
                 
                 printf "user %i" queryingActor
                 printfn " mentioned the following actor in its query %A" queriedActor
-                printAct<!PrintQueryMention(tweetList,actorRef.Path.Name)
+                printAct<!PrintQueryMention(actorRef.Path.Name)
                 if(totalOperations=0)then
                     mailbox.Context.Self<!GetSubscriberRanksInfo
             |Retweet(retweeter, tweetBy, actorRef,printAct)->
@@ -223,6 +233,7 @@ let Server(mailbox:Actor<_>)=
                 printfn "Total Queries processed %i" numQueries
                 let timeNum=timer1.ElapsedMilliseconds|>double
                 printfn "Time per operation %f" (double finalOperations/timeNum) 
+                printerActor<!Done
             |_ -> printf ""
         return! loop()
     }
